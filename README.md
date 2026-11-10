@@ -1,4 +1,13 @@
-# PlayGround
+# Ashfall — The Last Lantern
+
+A self-contained, 16-bit-inspired sidescroller. Play by opening `index.html` in a browser (or serve this folder with any static web server).
+
+- **Move:** ← / → or A / D
+- **Jump:** Space, ↑, or W
+- **Cast:** X / J (while an elemental lantern power is active)
+- **Pause:** Esc
+
+Cross two ruined districts, then face the Ashen Warden. Elemental lanterns grant temporary, optional ranged attacks in the travel stages; the final stage supplies the fire lantern needed to challenge the boss. Touch controls are included for phones and tablets.
 
 <!-- omgithub:readme:start -->
 ## 🚀 Build, play, and remix with OMGithub

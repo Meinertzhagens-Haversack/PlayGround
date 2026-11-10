@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10131c">
+<title>ASHFALL — The Last Lantern</title>
+<style>
+:root{color-scheme:dark;--ink:#11141c;--paper:#e9e3d2;--rust:#d27658;--muted:#97999a}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10131a;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--paper);touch-action:none}body{display:grid;place-items:center;background:radial-gradient(ellipse at 50% 45%,#262832,#10131a 75%)}#frame{position:relative;width:min(100vw, calc(100vh * 16 / 9));aspect-ratio:16/9;max-height:100dvh;background:#171922;box-shadow:0 20px 80px #000b;border:1px solid #49484a;overflow:hidden}canvas{width:100%;height:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges}#hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:#aaa9a1;font-size:10px;letter-spacing:.12em;pointer-events:none;text-shadow:0 2px #111}#touch{display:none;position:absolute;bottom:max(15px,env(safe-area-inset-bottom));left:0;right:0;justify-content:space-between;padding:0 18px;pointer-events:none}.cluster{display:flex;gap:10px;align-items:end}.touchbtn{pointer-events:auto;width:54px;height:54px;border:1px solid #d5c9b155;border-radius:50%;background:#15151bcc;color:#eee8d7;font: bold 18px monospace;box-shadow:inset 0 0 14px #ffffff12;touch-action:none}.touchbtn:active{background:#bd735866}.touchbtn.small{width:42px;height:42px;font-size:13px}@media (pointer:coarse){#touch{display:flex}#hint{bottom:86px;font-size:8px}}@media(max-aspect-ratio:4/5){#frame{width:100vw;max-height:75vh}#hint{bottom:8px}}
+</style>
+</head>
+<body><main id="frame"><canvas id="game" width="480" height="270" aria-label="Ashfall platform game"></canvas><div id="hint">MOVE ← → &nbsp; / &nbsp; JUMP SPACE &nbsp; / &nbsp; THROW X &nbsp; / &nbsp; PAUSE ESC</div><div id="touch"><div class="cluster"><button class="touchbtn" data-key="ArrowLeft">◀</button><button class="touchbtn" data-key="ArrowRight">▶</button></div><div class="cluster"><button class="touchbtn small" data-key="KeyX">✦</button><button class="touchbtn" data-key="Space">▲</button></div></div></main>
+<script>
+'use strict';
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+const W=480,H=270,GRAV=.34,MAX_FALL=6.4;
+const keys=new Set();let mode='title',levelIndex=0,world,player,camera=0,frame=0,shake=0,toast='',toastTime=0,score=0,lives=3,levelStart=0;
+const palette={sky:'#191d29',far:'#282a35',mid:'#34343b',ground:'#55504b',edge:'#918678',paper:'#ece6d5',black:'#171923',rust:'#c97458',gold:'#e0bd79',blue:'#66b9c9',red:'#e36d55',green:'#93b38c'};
+const levels=[
+ {name:'CINDER MILE',subtitle:'THE ROAD THAT FORGOT THE SUN',length:1820,theme:'cinder',power:'fire',blocks:[[0,230,380,40],[420,230,300,40],[785,230,380,40],[1230,230,300,40],[1585,230,235,40]],plats:[[160,184,78],[300,148,72],[470,188,74],[590,153,80],[730,185,72],[900,164,92],[1050,132,78],[1190,190,75],[1360,162,100],[1500,128,80],[1640,180,80]],pickups:[[280,126,'fire'],[905,140,'heart'],[1410,138,'fire']],enemies:[[340,214],[535,172],[845,214],[1085,116],[1290,214],[1540,112]],exit:1760},
+ {name:'DROWNED QUARTER',subtitle:'WHERE THE BELLS RING BELOW',length:1980,theme:'tide',power:'water',blocks:[[0,230,290,40],[340,230,350,40],[735,230,350,40],[1130,230,330,40],[1500,230,480,40]],plats:[[95,176,90],[235,144,72],[385,190,84],[520,158,92],[700,180,78],[830,143,98],[1000,186,80],[1160,150,90],[1320,116,76],[1470,180,90],[1640,150,90],[1800,182,86]],pickups:[[250,121,'water'],[615,136,'heart'],[1210,125,'water'],[1680,124,'heart']],enemies:[[180,158],[465,172],[635,214],[920,125],[1080,214],[1260,132],[1550,214],[1740,132]],exit:1915},
+ {name:'THE ASHEN KEEP',subtitle:'ONE LAST LIGHT BEFORE THE DARK',length:1100,theme:'keep',power:'fire',boss:true,blocks:[[0,230,1100,40]],plats:[[160,185,90],[330,155,90],[500,185,90],[670,155,90],[840,185,90]],pickups:[[80,195,'fire'],[450,150,'heart']],enemies:[[260,214],[580,214],[780,214]],exit:1020}
+];
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))}
+function text(s,x,y,size=8,color='#e9e3d2',align='left'){ctx.fillStyle=color;ctx.font=`${size}px monospace`;ctx.textAlign=align;ctx.fillText(s,x,y);ctx.textAlign='left'}
+function makeLevel(i){const d=levels[i];world={...d,blocks:d.blocks.map(a=>[...a]),plats:d.plats.map(a=>[...a]),pickups:d.pickups.map(([x,y,type])=>({x,y,type,taken:false})),enemies:d.enemies.map(([x,y],n)=>({x,y,w:13,h:14,vx:n%2?-.45:.45,alive:true,home:x,phase:n*2})),shots:[],foes:[],boss:d.boss?{x:825,y:174,hp:5,max:5,dir:-1,t:0,alive:true}:null};
+ player={x:34,y:204,w:11,h:22,vx:0,vy:0,face:1,onGround:false,power:d.boss?'fire':null,powerTime:d.boss?999:0,fireWait:0,invuln:0,anim:0};camera=0;levelStart=frame;if(d.boss){message('THE KEEP GIVES YOU ITS LAST EMBER',180)} }
+function message(s,t=110){toast=s;toastTime=t}
+function startGame(){levelIndex=0;score=0;lives=3;frame=0;makeLevel(0);mode='play'}
+function nextLevel(){levelIndex++;if(levelIndex>=levels.length){mode='win';return}makeLevel(levelIndex);message(levelIndex===2?'THE LAST EMBER IS YOURS. FIND THE WARDEN.':'A NEW ROAD OPENS...',100)}
+function hitPlayer(){if(player.invuln>0)return;lives--;player.invuln=100;player.vx=-player.face*2;player.vy=-3;if(lives<=0){mode='over';return}if(player.y>H){player.x=Math.max(camera+12,player.x-42);player.y=170;player.vy=0}else player.x=Math.max(camera+12,player.x-36);message('KEEP MOVING — '+lives+' LIGHTS LEFT',90)}
+function has(k){return keys.has(k)}
+function update(){frame++;if(mode!=='play')return;const p=player;
+ const left=has('ArrowLeft')||has('KeyA'),right=has('ArrowRight')||has('KeyD');p.vx=left?-1.45:right?1.45:p.vx*.72;if(left)p.face=-1;if(right)p.face=1;p.vy=Math.min(MAX_FALL,p.vy+GRAV);p.x+=p.vx;
+ // Side boundaries and platform collisions
+ p.x=Math.max(0,Math.min(world.length-p.w,p.x));p.onGround=false;const solids=[...world.blocks,...world.plats];for(const [x,y,w,h] of solids){if(p.x+p.w>x&&p.x<x+w&&p.y+p.h>y&&p.y<y+h){if(p.vy>=0&&p.y+p.h-p.vy<=y+2){p.y=y-p.h;p.vy=0;p.onGround=true}else if(p.vy<0&&p.y-p.vy>=y+h-2){p.y=y+h;p.vy=0}else if(p.vx>0)p.x=x-p.w;else if(p.vx<0)p.x=x+w}}
+ p.anim+=Math.abs(p.vx);if(p.invuln>0)p.invuln--;if(p.powerTime>0&&p.powerTime<900){p.powerTime--;if(!p.powerTime){p.power=null;message('THE ELEMENTAL GLOW FADES',70)}}if(p.fireWait>0)p.fireWait--;
+ if(has('Space')||has('ArrowUp')||has('KeyW')){if(p.onGround){p.vy=-5.8;p.onGround=false;keys.delete('Space');keys.delete('ArrowUp');keys.delete('KeyW')}}
+ if((has('KeyX')||has('KeyJ'))&&p.power&&p.fireWait===0){world.shots.push({x:p.x+(p.face>0?12:-5),y:p.y+9,vx:p.face*3.1,type:p.power,life:80});p.fireWait=24}
+ for(const e of world.enemies){if(!e.alive)continue;e.x+=e.vx;if(Math.abs(e.x-e.home)>40)e.vx*=-1;e.phase+=.1;if(overlap(p.x,p.y,p.w,p.h,e.x,e.y,e.w,e.h)){if(p.vy>0&&p.y+p.h<e.y+9){e.alive=false;p.vy=-4;score+=100}else hitPlayer()}}
+ for(const s of world.shots){s.x+=s.vx;s.life--;for(const e of world.enemies)if(e.alive&&overlap(s.x,s.y,5,4,e.x,e.y,e.w,e.h)){e.alive=false;s.life=0;score+=100}if(world.boss?.alive&&overlap(s.x,s.y,6,5,world.boss.x,world.boss.y,44,44)){if(s.type==='fire'){world.boss.hp--;score+=250;shake=7;message('THE WARDEN IS BURNING',45);if(world.boss.hp<=0){world.boss.alive=false;message('THE ASHEN WARDEN FALLS',140)}}s.life=0}}
+ world.shots=world.shots.filter(s=>s.life>0&&s.x>camera-20&&s.x<camera+W+30);
+ for(const f of world.foes){f.x+=f.vx;if(overlap(p.x,p.y,p.w,p.h,f.x,f.y,9,7))hitPlayer()}
+ if(world.boss?.alive){const b=world.boss;b.t++;b.x+=b.dir*.55;if(b.x<710||b.x>900)b.dir*=-1;if(b.t%100===0)world.foes.push({x:b.x+18,y:b.y+22,vx:p.x<b.x?-1.2:1.2});if(overlap(p.x,p.y,p.w,p.h,b.x,b.y+8,44,36)){if(p.vy>0&&p.y+p.h<b.y+16){p.vy=-4;b.hp--;shake=6}else hitPlayer()}}
+ world.foes=world.foes.filter(f=>f.x>camera-20&&f.x<camera+W+20);
+ for(const item of world.pickups){if(item.taken)continue;if(overlap(p.x,p.y,p.w,p.h,item.x,item.y,11,11)){item.taken=true;if(item.type==='heart'){lives=Math.min(3,lives+1);message('A LOST LIGHT — +1 HEART',70)}else{p.power=item.type;p.powerTime=650;message(item.type.toUpperCase()+' LANTERN — TEMPORARY POWER',90)}}}
+ if(p.y>H+30)hitPlayer();if(p.x-camera>W*.58)camera=Math.min(world.length-W,p.x-W*.58);if(camera<0)camera=0;
+ if(!world.boss&&p.x>world.exit){nextLevel()}if(world.boss&&!world.boss.alive&&p.x>world.exit){mode='win'}if(toastTime>0)toastTime--;if(shake>0)shake--;
+}
+function overlap(x,y,w,h,a,b,c,d){return x<a+c&&x+w>a&&y<b+d&&y+h>b}
+
+function background(){const tide=world?.theme==='tide',keep=world?.theme==='keep';const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,keep?'#171822':tide?'#19262d':'#1b202b');g.addColorStop(1,keep?'#493532':tide?'#38464a':'#51403b');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ // stars / drifting cinders
+ for(let i=0;i<48;i++){let x=((i*83-camera*(i%3===0?.08:.025))%(W+8)+W+8)%(W+8),y=(i*47+19)%137;rect(x,y,(i%7===0?2:1),1,i%4===0?'#d5a77d':'#777883')}
+ rect(363,35,38,38,tide?'#a1b6b2':'#c6b59b');rect(369,30,38,38,keep?'#30262d':tide?'#26333a':'#222632');
+ // distant broken skyline
+ for(let i=0;i<12;i++){let x=((i*67-camera*.16)%(W+90)+W+90)%(W+90)-35,h=42+(i*29%72);rect(x,164-h,34,h,'#252833');rect(x+5,158-h,4,h+8,'#2d303a');if(i%2===0){rect(x+12,177-h,3,7,'#a05f4d');rect(x+22,181-h,3,6,'#a05f4d')}}
+ // middle silhouettes
+ for(let i=0;i<9;i++){let x=((i*91-camera*.32)%(W+120)+W+120)%(W+120)-50;rect(x,190-(i*13%25),58,80,'#34333a');rect(x+8,177-(i*13%25),12,16,'#3e3a3b');rect(x+38,195-(i*13%25),5,7,'#9b6150')}
+ for(let i=0;i<20;i++){let x=((i*89-frame*(i%2?.24:.12))%(W+30)+W+30)%(W+30);let y=(i*61+frame*(i%3+1)*.18)%220;rect(x,y,1,2,i%3?'#a1654e':'#d18d60')}
+}
+function drawGround(){for(const [x,y,w,h] of [...world.blocks,...world.plats]){let sx=Math.floor(x-camera);if(sx+w<0||sx>W)continue;rect(sx,y,w,h,'#514c49');rect(sx,y,w,4,'#a19783');rect(sx,y+4,w,2,'#766e63');for(let tx=Math.floor(sx/16)*16;tx<sx+w;tx+=16){rect(tx,y+8,1,Math.min(h-8,20),'#665e58');if(((tx/16)|0)%2===0)rect(tx+7,y+20,3,2,'#393940')}rect(sx,y+h-3,w,3,'#302f37')}
+ // foreground cracks
+ for(let i=0;i<35;i++){let x=((i*57-camera*.9)%(W+30)+W+30)%(W+30);rect(x,244+(i*17%20),5+(i%3)*3,1,'#71675d')}}
+function drawPlayer(){const p=player;if(p.invuln&&Math.floor(frame/5)%2===0)return;const x=Math.round(p.x-camera),y=Math.round(p.y),tint=p.power==='fire'?'#d95745':p.power==='water'?'#4ca9c1':'#f0ead9',shade=p.power==='fire'?'#792f38':p.power==='water'?'#265771':'#292b35';let step=p.onGround&&Math.abs(p.vx)>.2?Math.floor(p.anim/3)%2:0;
+ // scarf and monochrome hooded silhouette
+ rect(x+2,y+2,8,7,'#191a22');rect(x+3,y,6,6,tint);rect(x+4,y+1,4,4,'#d7cdb8');rect(x+7,y+3,2,1,'#252630');rect(x+2,y+7,8,8,shade);rect(x+3,y+8,6,5,tint);rect(x+1,y+8,2,5,'#171922');rect(x+2,y+13,8,3,shade);rect(x-2,y+9,4,2,tint);rect(x-4,y+11,5,2,'#aaa394');rect(x+3,y+16,3,4,'#171922');rect(x+7,y+16,3,4,'#171922');rect(x+2+(step?1:0),y+20,4,2,tint);rect(x+7-(step?1:0),y+20,4,2,tint);if(p.power){rect(x+9,y+7,2,2,p.power==='fire'?'#ff8b55':'#95e4e9');rect(x+3,y-2,5,1,p.power==='fire'?'#ff9960':'#93e7ef')}}
+function drawEnemy(e){let x=Math.round(e.x-camera),y=Math.round(e.y);rect(x+2,y+2,9,10,'#25232a');rect(x,y+6,13,7,'#75564e');rect(x+2,y+4,3,2,'#d18a68');rect(x+8,y+4,3,2,'#d18a68');rect(x+1,y+12,4,2,'#25232a');rect(x+9,y+12,4,2,'#25232a');rect(x+3,y+7,2,2,'#f3d9ae');rect(x+8,y+7,2,2,'#f3d9ae')}
+function drawPickup(it){let x=Math.round(it.x-camera),y=it.y+Math.sin(frame*.08+it.x)*2;let color=it.type==='fire'?'#ef7354':it.type==='water'?'#70c7d7':'#e5d49c';rect(x+3,y-2,5,2,'#f3d9ad');rect(x+1,y,9,8,color);rect(x+3,y+2,5,4,it.type==='heart'?'#b84d50':'#fff0c4');rect(x+4,y+3,3,2,color);}
+function drawBoss(){const b=world.boss;if(!b?.alive)return;let x=Math.round(b.x-camera),y=Math.round(b.y),blink=b.t%30<15?'#a85147':'#854743';rect(x+6,y+5,32,36,'#292631');rect(x+1,y+10,42,26,blink);rect(x+7,y+2,30,8,'#3d3740');rect(x+5,y,6,8,'#d0bfa1');rect(x+33,y,6,8,'#d0bfa1');rect(x+10,y+13,8,5,'#f2c07d');rect(x+27,y+13,8,5,'#f2c07d');rect(x+13,y+15,3,3,'#241d26');rect(x+29,y+15,3,3,'#241d26');rect(x+16,y+25,13,3,'#30212a');rect(x+18,y+28,3,3,'#e1c49b');rect(x+24,y+28,3,3,'#e1c49b');rect(x+7,y+34,8,9,'#171923');rect(x+29,y+34,8,9,'#171923');rect(319,27,128,6,'#292631');rect(321,29,124,3,'#5a3437');rect(321,29,124*b.hp/b.max,3,'#e16e54');text('WARDEN',383,23,6,'#eadac0','center')}
+function drawHUD(){rect(8,8,160,29,'#11131bdc');rect(8,8,2,29,'#ba7458');text('ASHFALL  /  '+String(levelIndex+1).padStart(2,'0'),16,18,7,'#c6b49b');text(world.name,16,30,9,'#f0e9d8');for(let i=0;i<3;i++){rect(415+i*15,12,10,9,i<lives?'#cf755d':'#413b3d');rect(417+i*15,14,6,5,i<lives?'#edb08b':'#5a5150')}text('✦ '+score,464,34,7,'#ddd1b8','right');if(player.power&&player.powerTime<900){rect(351,8,58,8,'#171822');rect(353,10,54,4,'#4b4140');rect(353,10,54*player.powerTime/650,4,player.power==='fire'?'#df6e51':'#61b8c5');text(player.power.toUpperCase(),380,27,6,player.power==='fire'?'#ed896a':'#83d1db','center')}}
+function draw(){ctx.save();if(shake)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);background();drawGround();for(const it of world.pickups)if(!it.taken)drawPickup(it);for(const e of world.enemies)if(e.alive)drawEnemy(e);for(const s of world.shots){rect(s.x-camera,s.y,6,4,s.type==='fire'?'#ff8758':'#7ce4ef');rect(s.x-camera+(s.vx<0?4:0),s.y+1,2,2,'#fff0bf')}for(const f of world.foes){rect(f.x-camera,f.y,9,7,'#e27c56');rect(f.x-camera+2,f.y+2,4,3,'#ffd18e')}drawBoss();
+ // destination marker
+ if(world.exit-camera<W){let x=world.exit-camera;rect(x,175,3,55,'#c6bca7');rect(x+3,176,14,10,'#b55c4d');rect(x+3,186,10,3,'#e3bd83')}
+ drawPlayer();drawHUD();if(toastTime>0){rect(100,48,280,18,'#11131be8');text(toast,W/2,60,7,'#e8d9bd','center')}if(mode==='paused'){overlay('PAUSED','ESC TO RETURN','THE ROAD WAITS FOR NO ONE')}ctx.restore();if(mode==='title')titleScreen();if(mode==='over')endScreen(false);if(mode==='win')endScreen(true)}
+function overlay(title,sub,tag){rect(0,0,W,H,'#0e1119bc');text(tag,W/2,90,7,'#bd8a68','center');text(title,W/2,130,23,'#eee7d6','center');text(sub,W/2,151,8,'#c6bba8','center')}
+function titleScreen(){rect(0,0,W,H,'#10131ad9');for(let i=0;i<14;i++){let x=15+i*36;rect(x,189-(i*23%85),19,81,'#292b35');rect(x+5,185-(i*23%85),3,9,'#a85e4d')}rect(0,226,W,44,'#302d32');text('A SMALL 16-BIT TALE',W/2,69,7,'#bd8d6a','center');text('ASHFALL',W/2,112,35,'#eee8d9','center');text('THE LAST LANTERN',W/2,129,9,'#c3775b','center');rect(150,145,180,1,'#82715f');text('A quiet world. A stubborn little light.',W/2,163,8,'#d2c8b7','center');text('RUN  ·  JUMP  ·  KEEP THE DARK BACK',W/2,180,7,'#a8a398','center');if(Math.floor(frame/28)%2===0)text('PRESS ANY KEY OR TAP TO BEGIN',W/2,210,8,'#efd39f','center');text('ARROWS / WASD   •   SPACE TO JUMP   •   X TO CAST',W/2,249,6,'#aaa69e','center')}
+function endScreen(won){rect(0,0,W,H,'#10131ae8');text(won?'THE NIGHT BREAKS':'THE LIGHT GOES OUT',W/2,96,7,won?'#d8b27e':'#bf7864','center');text(won?'YOU CARRIED IT FAR ENOUGH.':'ASHFALL REMEMBERS YOUR FOOTSTEPS.',W/2,130,17,'#eee7d6','center');text(won?'THE ASHEN WARDEN IS SILENT. THE ROAD IS YOURS.':'SCORE  '+score,W/2,153,8,'#c6bba8','center');text('PRESS ENTER TO WALK AGAIN',W/2,193,8,'#e0c58f','center');text('THANK YOU FOR KEEPING THE LANTERN',W/2,232,7,'#8e8d90','center')}
+function loop(){update();if(mode==='play'||mode==='paused'||mode==='title'||mode==='over'||mode==='win')draw();requestAnimationFrame(loop)}
+window.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();if(e.code==='Escape'){if(mode==='play')mode='paused';else if(mode==='paused')mode='play';return}if((mode==='title'||mode==='over'||mode==='win')&&(e.code==='Enter'||e.code==='Space'||e.code==='KeyX')){startGame();return}if(mode==='paused'&&e.code==='Enter')mode='play';keys.add(e.code)});window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>keys.clear());canvas.addEventListener('pointerdown',()=>{if(mode==='title'||mode==='over'||mode==='win')startGame();else if(mode==='paused')mode='play'});
+document.querySelectorAll('.touchbtn').forEach(btn=>{const code=btn.dataset.key;btn.addEventListener('pointerdown',e=>{e.preventDefault();btn.setPointerCapture(e.pointerId);if((mode==='title'||mode==='over'||mode==='win'))startGame();keys.add(code)});for(const ev of ['pointerup','pointercancel','lostpointercapture'])btn.addEventListener(ev,()=>keys.delete(code))});
+makeLevel(0);mode='title';loop();
+</script></body></html>
