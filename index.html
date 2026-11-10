@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#101513">
+  <title>ASHEN — A 16-bit platform adventure</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Ashen home"><span class="brand-mark">A</span><span>ASHEN<span class="brand-dot">.</span></span></a>
+      <div class="top-tag"><span class="status-dot"></span> AN ORIGINAL 16-BIT ADVENTURE</div>
+      <button class="sound-button" id="soundToggle" aria-label="Toggle sound">♫ <span>Sound on</span></button>
+    </header>
+    <section class="game-wrap" aria-label="Game">
+      <div class="game-frame">
+        <canvas id="game" width="960" height="540" aria-label="Ashen platform game"></canvas>
+        <div class="screen" id="titleScreen">
+          <div class="title-copy">
+            <div class="eyebrow"><span></span> A QUIET WORLD, A BRAVE HEART</div>
+            <h1>THE<br><em>ASHEN</em><br>ROAD</h1>
+            <p>The light is fading from the old places.<br>Someone has to bring it back.</p>
+            <button class="primary-button" id="startButton">BEGIN JOURNEY <span>→</span></button>
+            <div class="title-foot">3 REGIONS <b>·</b> 1 SHADOW KING <b>·</b> YOUR OWN PACE</div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="moon"></div><div class="ruin ruin-one"></div><div class="ruin ruin-two"></div>
+            <div class="hero-pixel"><i class="scarf"></i><i class="face"></i><i class="coat"></i><i class="boot"></i></div>
+            <div class="hero-caption"><span>THE WAYFARER</span><small>NO CROWN. NO PROPHECY. JUST ONE MORE STEP.</small></div>
+          </div>
+          <div class="title-stamp">VOL. 01<br><b>THE LONG<br>AFTER</b></div>
+        </div>
+        <div class="overlay hidden" id="pauseScreen"><div class="dialog-card"><div class="eyebrow">TAKE YOUR TIME</div><h2>PAUSED</h2><p>The road will wait.</p><button class="primary-button" id="resumeButton">BACK TO THE ROAD <span>→</span></button><button class="text-button" id="restartPause">RESTART JOURNEY</button></div></div>
+        <div class="overlay hidden" id="endScreen"><div class="dialog-card"><div class="eyebrow" id="endEyebrow">THE ROAD CONTINUES</div><h2 id="endTitle">A NEW DAWN</h2><p id="endText">The valley remembers the light.</p><button class="primary-button" id="continueButton">CONTINUE <span>→</span></button><button class="text-button" id="endMenuButton">RETURN TO TITLE</button></div></div>
+        <div class="touch-controls" id="touchControls" aria-label="Touch controls">
+          <div class="touch-dpad"><button data-control="left" aria-label="Move left">‹</button><button data-control="right" aria-label="Move right">›</button></div>
+          <div class="touch-actions"><button class="action-fire" data-control="fire" aria-label="Use power">✦</button><button class="action-jump" data-control="jump" aria-label="Jump">↑</button></div>
+        </div>
+      </div>
+      <div class="below-game">
+        <div class="level-label"><span class="tiny-label">CURRENT CHAPTER</span><strong id="chapterName">THE QUIET VALLEY</strong></div>
+        <div class="objective" id="objective">Find the old road. Keep moving.</div>
+        <div class="progress"><span id="progressText">01 / 03</span><div class="progress-track"><i id="progressBar"></i></div></div>
+        <button class="pause-button" id="pauseButton" aria-label="Pause game">Ⅱ</button>
+      </div>
+    </section>
+    <section class="info-row">
+      <div class="guide-card"><span class="guide-icon">✳</span><div><b>THE WAYFARER</b><p>Walk, jump, and keep an eye on the edges. The road rewards patience.</p></div></div>
+      <div class="guide-card"><span class="guide-icon power-icon">◈</span><div><b>SHORT-LIVED LIGHT</b><p>Find a shard to borrow its element. Helpful, never required. Effects fade with time.</p></div></div>
+      <div class="control-hint"><span>MOVE</span> <kbd>←</kbd><kbd>→</kbd><span>JUMP</span> <kbd>SPACE</kbd> <span>POWER</span> <kbd>X</kbd></div>
+    </section>
+    <footer><span>ASHEN ROAD <b>©</b> AN ORIGINAL LITTLE ADVENTURE</span><span>MADE FOR SMALL SCREENS & LONG WALKS</span></footer>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
